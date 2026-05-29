@@ -86,7 +86,11 @@ export default function LandingPage() {
   }, []);
 
   const badgeUrl = `/api/streak?user=${debouncedUsername}`;
-  const markdown = `![CommitPulse](https://commitpulse.vercel.app/api/streak?user=${trimmedUsername})`;
+  const markdown = `![CommitPulse](${
+    mounted
+      ? window.location.origin
+      : (process.env.NEXT_PUBLIC_SITE_URL ?? 'https://commitpulse.vercel.app')
+  }/api/streak?user=${trimmedUsername})`;
 
   // Fetch SVG content whenever debounced username changes.
   useEffect(() => {

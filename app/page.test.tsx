@@ -182,9 +182,7 @@ describe('LandingPage', () => {
     fireEvent.click(copyButton!);
 
     expect(navigator.clipboard.writeText).toHaveBeenCalledWith(
-      expect.stringContaining(
-        '![CommitPulse](https://commitpulse.vercel.app/api/streak?user=jhasourav07)'
-      )
+      expect.stringContaining('/api/streak?user=jhasourav07')
     );
 
     await waitFor(() => {
