@@ -656,7 +656,7 @@ describe('streakParamsSchema — Date Range Boundary Robustness (Variation 1)', 
     // Arrange: Provide a mock payload missing a full YYYY format sequence
     const partialYearPayload = {
       user: 'octocat',
-      from: '05-12', 
+      from: '05-12',
       to: '05-30',
     };
 
@@ -674,7 +674,7 @@ describe('streakParamsSchema — Date Range Boundary Robustness (Variation 1)', 
   it('should pass cleanly and fallback to default ranges when date bounds are completely omitted', () => {
     // Arrange: Pass only the bare minimum required parameters
     const minimalPayload = {
-      user: 'octocat'
+      user: 'octocat',
     };
 
     // Act
