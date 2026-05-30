@@ -1208,7 +1208,7 @@ describe('GET /api/streak', () => {
       const body = await response.text();
 
       expect(response.status).toBe(200);
-      expect(body).toContain('family=Inter&display=swap');
+      expect(body).toContain('family=Inter&amp;display=swap');
       expect(body).toContain('"Inter", sans-serif');
     });
   });

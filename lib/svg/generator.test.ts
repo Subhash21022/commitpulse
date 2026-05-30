@@ -506,7 +506,7 @@ describe('generateSVG', () => {
       );
 
       expect(svg).toContain(
-        "@import url('https://fonts.googleapis.com/css2?family=Inter&display=swap');"
+        "@import url('https://fonts.googleapis.com/css2?family=Inter&amp;display=swap');"
       );
       expect(svg).toContain('font-family: "Inter", sans-serif;');
     });
@@ -966,7 +966,7 @@ describe('generateMonthlySVG', () => {
     } as unknown as BadgeParams);
 
     expect(svg).toContain(
-      "@import url('https://fonts.googleapis.com/css2?family=Inter&display=swap');"
+      "@import url('https://fonts.googleapis.com/css2?family=Inter&amp;display=swap');"
     );
     expect(svg).toContain('font-family: "Inter", sans-serif;');
   });
