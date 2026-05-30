@@ -58,13 +58,15 @@ function dimensionParam(name: string, min: number, max: number) {
     .transform(toDimensionValue);
 }
 
+const GITHUB_USERNAME_REGEX = /^[a-zA-Z0-9](?:[a-zA-Z0-9]|-(?=[a-zA-Z0-9]))*$/;
+
 export const streakParamsSchema = z.object({
   // Required — missing user surfaces as "Missing" to match existing tests
   user: z
     .string({ error: 'Missing user parameter' })
     .min(1, { message: 'Missing user parameter' })
     .max(39, { message: 'GitHub username cannot exceed 39 characters' })
-    .regex(/^[a-zA-Z0-9](?:[a-zA-Z0-9]|-(?=[a-zA-Z0-9]))*$/, {
+    .regex(GITHUB_USERNAME_REGEX, {
       message: 'Invalid GitHub username',
     }),
 
@@ -218,7 +220,11 @@ export const streakParamsSchema = z.object({
 export const githubParamsSchema = z.object({
   username: z
     .string({ error: 'Missing "username" parameter' })
-    .min(1, { message: 'Username is required' }),
+    .min(1, { message: 'Username is required' })
+    .max(39, { message: 'GitHub username cannot exceed 39 characters' })
+    .regex(GITHUB_USERNAME_REGEX, {
+      message: 'Invalid GitHub username',
+    }),
   refresh: z.string().optional().transform(toRefreshFlag),
 });
 
@@ -258,7 +264,13 @@ export const ogParamsSchema = z
   }));
 
 export const statsParamsSchema = z.object({
-  user: z.string({ error: 'Missing user parameter' }).min(1, { message: 'Missing user parameter' }),
+  user: z
+    .string({ error: 'Missing user parameter' })
+    .min(1, { message: 'Missing user parameter' })
+    .max(39, { message: 'GitHub username cannot exceed 39 characters' })
+    .regex(GITHUB_USERNAME_REGEX, {
+      message: 'Invalid GitHub username',
+    }),
   refresh: z.string().optional().transform(toRefreshFlag),
   tz: z.string().optional(),
 });
