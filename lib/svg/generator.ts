@@ -665,8 +665,7 @@ export function generateMonthlySVG(stats: MonthlyStats, params: BadgeParams): st
       : null;
 
   const statsFont = selectedFont || '"Space Grotesk", sans-serif';
-  const parsedRadius = Number(params.radius);
-  const radius = Math.max(0, Math.min(Number.isNaN(parsedRadius) ? 8 : parsedRadius, 50));
+  const radius = sanitizeRadius(params.radius, 8);
   const labels = getLabels(params.lang);
 
   const width = params.width || 300;
@@ -790,8 +789,7 @@ export function generateWrappedSVG(
       : null;
 
   const statsFont = selectedFont || '"Space Grotesk", sans-serif';
-  const parsedRadius = Number(params.radius);
-  const radius = Math.max(0, Math.min(Number.isNaN(parsedRadius) ? 8 : parsedRadius, 50));
+  const radius = sanitizeRadius(params.radius, 8);
 
   const width = params.width || 420;
   const height = params.height || 260;
@@ -1050,8 +1048,7 @@ function generateAutoThemeMonthlySVG(stats: MonthlyStats, params: BadgeParams): 
   const googleFontsImport = googleFontUrlPart
     ? `@import url('https://fonts.googleapis.com/css2?family=${googleFontUrlPart}&amp;display=swap');`
     : '';
-  const parsedRadius = Number(params.radius);
-  const radius = Math.max(0, Math.min(Number.isNaN(parsedRadius) ? 8 : parsedRadius, 50));
+  const radius = sanitizeRadius(params.radius, 8);
   const labels = getLabels(params.lang);
 
   const width = params.width || 300;
