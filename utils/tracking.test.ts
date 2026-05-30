@@ -62,4 +62,20 @@ describe('trackUser', () => {
 
     expect(fetchMock).toHaveBeenCalledTimes(1);
   });
+
+  it('gracefully bypasses tracking when user metric logs are empty or falsy', () => {
+    const fetchMock = vi.fn().mockResolvedValue({});
+    vi.stubGlobal('fetch', fetchMock);
+
+    const sendBeaconMock = vi.fn().mockReturnValue(true);
+    Object.defineProperty(navigator, 'sendBeacon', {
+      value: sendBeaconMock,
+      configurable: true,
+    });
+
+    trackUser('');
+
+    expect(sendBeaconMock).not.toHaveBeenCalled();
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
 });
