@@ -11,7 +11,6 @@ import {
   sanitizeRadius,
   sanitizeGoogleFontUrl,
   getLuminance,
-  normalizeHexColor,
   parseGradientStops,
   getGradientCoordinates,
 } from './sanitizer';
@@ -158,15 +157,16 @@ function renderHeader(
 
 /**
  * Generates custom SVG gradient definitions from gradient_stops and gradient_dir parameters.
- * Returns a string of linearGradient elements for each intensity level (1-4).
- * If custom stops are invalid or insufficient, returns an empty string (fallback to default behavior).
+ * Returns an object with gradient SVG elements and the gradient ID (or empty string if invalid).
+ * If custom stops are invalid or insufficient, returns { gradients: '', gradientId: '' }.
+ * Also stores the gradient ID on the params object for tower rendering to use.
  */
-function generateCustomGradients(params: BadgeParams, bgHex: string): string {
+function generateCustomGradients(params: BadgeParams): { gradients: string; gradientId: string } {
   const stops = parseGradientStops(params.gradient_stops);
 
   // Require at least 2 valid colors for custom gradient
   if (stops.length < 2) {
-    return '';
+    return { gradients: '', gradientId: '' };
   }
 
   const coords = getGradientCoordinates(params.gradient_dir);
@@ -207,10 +207,10 @@ ${stopElements}
       </linearGradient>`;
   }
 
-  // Store the gradient ID in a temporary attribute so tower rendering can use it
-  (params as any).__customGradientId = gradientId;
+  // Store the gradient ID on params for tower rendering to use
+  params.__customGradientId = gradientId;
 
-  return gradients;
+  return { gradients, gradientId };
 }
 
 function renderDefs(sf: number, params: BadgeParams): string {
@@ -219,15 +219,15 @@ function renderDefs(sf: number, params: BadgeParams): string {
   let gradients = '';
   if (params.gradient) {
     // Try to use custom gradient if gradient_stops is provided
-    const bgStr = params.bg || '0d1117';
-    const bgHex = bgStr.startsWith('#') ? bgStr : `#${bgStr}`;
-
-    const customGradients = generateCustomGradients(params, bgHex);
-    if (customGradients) {
+    const result = generateCustomGradients(params);
+    if (result.gradientId) {
       // Custom gradient stops were valid and used
-      gradients = customGradients;
+      gradients = result.gradients;
     } else {
       // Fallback to default gradient behavior
+      const bgStr = params.bg || '0d1117';
+      const bgHex = bgStr.startsWith('#') ? bgStr : `#${bgStr}`;
+
       if (params.autoTheme) {
         for (let i = 0; i < 4; i++) {
           const level = i + 1;
@@ -245,7 +245,9 @@ function renderDefs(sf: number, params: BadgeParams): string {
               const c = accent[idx] || accent[accent.length - 1] || '00ffaa';
               return c.startsWith('#') ? c : `#${c}`;
             })
-          : [0, 1, 2, 3].map(() => (String(accent).startsWith('#') ? String(accent) : `#${accent}`));
+          : [0, 1, 2, 3].map(() =>
+              String(accent).startsWith('#') ? String(accent) : `#${accent}`
+            );
 
         colors.forEach((c, idx) => {
           const level = idx + 1;
@@ -405,7 +407,7 @@ function renderTowers(
 
     if (!isGhost && t.intensityLevel > 0 && params.gradient === true) {
       // Use custom gradient ID if available, otherwise use default gradient ID
-      const customGradId = (params as any).__customGradientId;
+      const customGradId = params.__customGradientId;
       const gradId = customGradId
         ? `${customGradId}-level-${t.intensityLevel}`
         : `tower-grad-level-${t.intensityLevel}`;

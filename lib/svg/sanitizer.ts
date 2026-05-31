@@ -167,9 +167,12 @@ export function parseGradientStops(input?: string): string[] {
  * Returns {x1, y1, x2, y2} as percentage strings suitable for SVG linearGradient attributes.
  * Defaults to 'vertical' if direction is invalid.
  */
-export function getGradientCoordinates(
-  dir?: string
-): { x1: string; y1: string; x2: string; y2: string } {
+export function getGradientCoordinates(dir?: string): {
+  x1: string;
+  y1: string;
+  x2: string;
+  y2: string;
+} {
   const direction = (dir || 'vertical').toLowerCase().trim();
 
   switch (direction) {

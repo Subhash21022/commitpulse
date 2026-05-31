@@ -228,6 +228,9 @@ export interface BadgeParams {
   disable_particles?: boolean;
   animate?: boolean;
   glow?: boolean;
+
+  /** @internal Temporary property to track custom gradient ID during SVG generation. */
+  __customGradientId?: string;
 }
 
 export interface GraphNode {
