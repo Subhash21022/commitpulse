@@ -243,6 +243,27 @@ describe('User Model', () => {
       readyStateSpy.mockRestore();
       startSessionSpy.mockRestore();
     });
+
+    it('rejects new queries immediately when connection transitions to state 3 (disconnecting)', async (): Promise<void> => {
+      const readyStateSpy = vi
+        .spyOn(mongoose.connection, 'readyState', 'get')
+        .mockReturnValue(3 as unknown as typeof mongoose.connection.readyState);
+
+      expect(mongoose.connection.readyState).toBe(3);
+
+      const mockDisconnectingError = new Error('Connection is closing');
+      mockDisconnectingError.name = 'DisconnectingError';
+
+      const findOneSpy = vi.spyOn(User, 'findOne').mockRejectedValue(mockDisconnectingError);
+
+      await expect(User.findOne({ username: 'testuser' })).rejects.toThrow('Connection is closing');
+      await expect(User.findOne({ username: 'testuser' })).rejects.toMatchObject({
+        name: 'DisconnectingError',
+      });
+
+      readyStateSpy.mockRestore();
+      findOneSpy.mockRestore();
+    });
   });
 
   describe('Database Connection State 99 Handling (Lazy Initialization Tracking)', () => {
