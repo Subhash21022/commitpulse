@@ -262,7 +262,7 @@ describe('ShareSheet', () => {
   // ── Close behaviour --------------------------------------------------------
   it('renders close button with correct aria-label and calls onClose', () => {
     render(<ShareSheet {...defaultProps} />);
-    const closeButton = screen.getByLabelText('Close share options panel');
+    const closeButton = screen.getByLabelText('Close share panel');
     expect(closeButton).toBeDefined();
     fireEvent.click(closeButton);
     expect(defaultProps.onClose).toHaveBeenCalled();

@@ -17,6 +17,12 @@ function GithubMark() {
 
 const NAV_LINKS = [
   {
+    label: 'Generator',
+    href: '/generator',
+    isExternal: false,
+    isPrimary: false,
+  },
+  {
     label: 'Compare',
     href: '/compare',
     isExternal: false,

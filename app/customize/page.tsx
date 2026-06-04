@@ -324,6 +324,9 @@ function CustomizePageInner(): ReactElement {
       announceCopyStatus(t('dashboard.share.failed'));
     }
   };
+  const handleDownloadimage = () => {
+    alert('Download image functionality coming soon!');
+  };
 
   return (
     <div className="min-h-screen bg-transparent text-zinc-900 dark:text-white font-sans overflow-x-hidden">

@@ -157,7 +157,10 @@
     },
     "clock": {
       "title": "\u63d0\u4ea4\u65f6\u949f",
-      "active_days": "\u6d3b\u8dc3\u5929\u6570"
+      "active_days": "\u6d3b\u8dc3\u5929\u6570",
+      "tooltip_no_commits": "\u8be5\u5de5\u4f5c\u65e5\u65e0\u63d0\u4ea4\u8bb0\u5f55",
+      "tooltip_peak": "\u6b64\u5468\u671f\u4e2d\u7684\u6700\u6d3b\u8dc3\u5de5\u4f5c\u65e5",
+      "tooltip_activity": "\u6bcf\u5468\u6d3b\u52a8\u70b9"
     },
     "heatmap": {
       "title": "\u8d21\u732e\u70ed\u529b\u56fe",

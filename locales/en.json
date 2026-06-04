@@ -171,7 +171,10 @@
     },
     "clock": {
       "title": "Commit Clock",
-      "active_days": "Active Days"
+      "active_days": "Active Days",
+      "tooltip_no_commits": "No commits recorded for this weekday",
+      "tooltip_peak": "Peak weekday in this cycle",
+      "tooltip_activity": "Weekly activity point"
     },
     "heatmap": {
       "title": "Contribution Heatmap",
@@ -204,7 +207,7 @@
     },
     "share": {
       "title": "Share Pulse",
-      "close_aria": "Close share options panel",
+      "close_aria": "Close share panel",
       "copy_link": "Copy Link",
       "copy_link_desc": "Copy your profile URL to clipboard",
       "link_copied": "Link copied",

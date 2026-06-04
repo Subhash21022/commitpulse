@@ -157,7 +157,10 @@
     },
     "clock": {
       "title": "Horloge des commits",
-      "active_days": "Jours actifs"
+      "active_days": "Jours actifs",
+      "tooltip_no_commits": "Aucun commit enregistr\u00e9 pour ce jour de la semaine",
+      "tooltip_peak": "Jour de la semaine le plus actif de ce cycle",
+      "tooltip_activity": "Point d'activit\u00e9 hebdomadaire"
     },
     "heatmap": {
       "title": "Carte thermique des contributions",
