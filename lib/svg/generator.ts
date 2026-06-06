@@ -909,7 +909,7 @@ export function generateMonthlySVG(stats: MonthlyStats, params: BadgeParams): st
 
   const commitsLabel =
     params.mode === 'loc' ? 'LINES THIS MONTH (EST.)' : labels.COMMITS_THIS_MONTH;
-  const deltaUnit = params.mode === 'loc' ? 'LINES (EST.)' : 'COMMITS';
+  const deltaUnit = params.mode === 'loc' ? 'LINES (EST.)' : 'commits';
 
   let deltaText = '';
   if (params.delta_format === 'absolute') {
@@ -1280,7 +1280,7 @@ function generateAutoThemeMonthlySVG(stats: MonthlyStats, params: BadgeParams): 
 
   const commitsLabel =
     params.mode === 'loc' ? 'LINES THIS MONTH (EST.)' : labels.COMMITS_THIS_MONTH;
-  const deltaUnit = params.mode === 'loc' ? 'LINES (EST.)' : 'COMMITS';
+  const deltaUnit = params.mode === 'loc' ? 'LINES (EST.)' : 'commits';
 
   let deltaText = '';
   if (params.delta_format === 'absolute') {
