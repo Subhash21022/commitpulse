@@ -196,6 +196,13 @@ describe('CompareClient', () => {
   });
 
   it('shows error message when api request fails', async () => {
+    localStorage.clear();
+    // Also clear the Cache API to avoid previously cached successful responses
+    // from other tests bypassing the network error path.
+    const maybeCaches = (global as unknown as { caches?: CacheStorage }).caches;
+    if (maybeCaches && typeof maybeCaches.delete === 'function') {
+      await maybeCaches.delete('commitpulse-compare');
+    }
     global.fetch = vi.fn(
       async () =>
         ({
