@@ -247,6 +247,12 @@ export interface BadgeParams {
   shading?: boolean;
 
   /**
+   * When true, dims weekend towers (Saturdays and Sundays) to 0.3 opacity.
+   * Default is false.
+   */
+  dim_weekends?: boolean;
+
+  /**
    * Global opacity scalar applied to all tower face fill-opacity values (0.1–1.0).
    * Default is 1.0 (fully opaque, current behavior). Values below 0.1 are clamped
    * to 0.1; values above 1.0 are clamped to 1.0.

@@ -875,6 +875,25 @@ describe('streakParamsSchema — boolean transform fields', () => {
       expect(parse({}).glow).toBe(true);
     });
   });
+
+  // ── dim_weekends ───────────────────────────────────────────────────────────
+  describe('dim_weekends', () => {
+    it('returns true when dim_weekends="true"', () => {
+      expect(parse({ dim_weekends: 'true' }).dim_weekends).toBe(true);
+    });
+
+    it('returns true when dim_weekends="1"', () => {
+      expect(parse({ dim_weekends: '1' }).dim_weekends).toBe(true);
+    });
+
+    it('returns false when dim_weekends="false"', () => {
+      expect(parse({ dim_weekends: 'false' }).dim_weekends).toBe(false);
+    });
+
+    it('returns false when dim_weekends is omitted', () => {
+      expect(parse({}).dim_weekends).toBe(false);
+    });
+  });
 });
 
 describe('streakParamsSchema — org parameter validation', () => {
