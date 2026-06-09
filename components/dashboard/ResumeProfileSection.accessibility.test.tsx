@@ -135,7 +135,6 @@ describe('ResumeProfileSection – accessibility', () => {
 
     // Tab once – focus should land on the upload button.
     await user.tab();
-    const uploadButton = screen.getByRole('button', { name: /upload resume file/i });
     expect(document.activeElement).toBe(uploadButton);
 
     // Activate it to advance to the preview stage.
