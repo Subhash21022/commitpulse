@@ -126,9 +126,12 @@ export async function GET(request: Request) {
         timezone = new Intl.DateTimeFormat(undefined, { timeZone: tzParam }).resolvedOptions()
           .timeZone;
       } catch (error) {
-        if (error instanceof Error && error.name === 'ValidationError') {
-          return NextResponse.json({ error: error.message }, { status: 400 });
+        if (error instanceof RangeError) {
+          const validationErr = new Error(`Invalid timezone: ${tzParam}`);
+          validationErr.name = 'ValidationError';
+          throw validationErr;
         }
+        throw error;
       }
     }
 
