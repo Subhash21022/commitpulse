@@ -2429,7 +2429,7 @@ export function generatePulseSVG(
   </style>
 
   <defs>
-    <filter id="glow" x="-20%" y="-20%" width="140%" height="140%">
+    <filter id="glow" x="-50%" y="-50%" width="200%" height="200%">
       <feGaussianBlur stdDeviation="4" result="blur" />
       <feMerge>
         <feMergeNode in="blur" />
@@ -2617,7 +2617,7 @@ function generateAutoThemePulseSVG(
   </style>
 
   <defs>
-    <filter id="glow" x="-20%" y="-20%" width="140%" height="140%">
+    <filter id="glow" x="-50%" y="-50%" width="200%" height="200%">
       <feGaussianBlur stdDeviation="4" result="blur" />
       <feMerge>
         <feMergeNode in="blur" />
