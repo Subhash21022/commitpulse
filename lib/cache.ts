@@ -1,5 +1,6 @@
 import { randomUUID } from 'crypto';
 import { brotliCompressSync, brotliDecompressSync } from 'zlib';
+import logger from '@/lib/logger';
 
 /**
  * Represents a cached item with its expiration timestamp.
@@ -333,7 +334,11 @@ export class DistributedCache<T> {
       this.localCache.set(key, parsed, localTtlMs);
       return parsed;
     } catch (err) {
-      console.error(`[DistributedCache] GET failed for key "${key}":`, err);
+      logger.error('Cache GET failed', {
+        component: 'DistributedCache',
+        key,
+        error: err,
+      });
       return this.localCache.get(key);
     }
   }
@@ -361,7 +366,11 @@ export class DistributedCache<T> {
         throw new Error(`Redis HTTP error: ${res.status}`);
       }
     } catch (err) {
-      console.error(`[DistributedCache] SET failed for key "${key}":`, err);
+      logger.error('Cache SET failed', {
+        component: 'DistributedCache',
+        key,
+        error: err,
+      });
     }
   }
 
@@ -388,7 +397,11 @@ export class DistributedCache<T> {
       const data = await res.json();
       return Boolean(data.result);
     } catch (err) {
-      console.error(`[DistributedCache] DELETE failed for key "${key}":`, err);
+      logger.error('Cache DELETE failed', {
+        component: 'DistributedCache',
+        key,
+        error: err,
+      });
       return localDeleted;
     }
   }
@@ -439,8 +452,12 @@ export class DistributedCache<T> {
 
       return updated;
     } catch (err) {
-      console.error(`[DistributedCache] UPDATE failed for key "${key}":`, err);
-      return false;
+      logger.error('Cache UPDATE failed', {
+        component: 'DistributedCache',
+        key,
+        error: err,
+      });
+      return true;
     }
   }
 
@@ -497,7 +514,11 @@ return c`;
       this.localCache.set(key, count as unknown as T, ttlMs);
       return count;
     } catch (err) {
-      console.error(`[DistributedCache] INCR failed for key "${key}":`, err);
+      logger.error('Cache INCR failed', {
+        component: 'DistributedCache',
+        key,
+        error: err,
+      });
       const current = (this.localCache.get(key) as unknown as number) || 0;
       const next = current + 1;
       if (current === 0) {
@@ -623,7 +644,11 @@ return c`;
           }
         } catch (err) {
           // Redis network error during locking. Fallback to direct execution.
-          console.error(`[DistributedCache] Lock error for "${key}":`, err);
+          logger.error('Cache lock failed', {
+            component: 'DistributedCache',
+            key,
+            error: err,
+          });
           const fallbackData = await loadFn(cached);
           await this.set(key, fallbackData, ttlMs);
           return fallbackData;

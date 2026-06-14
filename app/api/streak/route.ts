@@ -31,6 +31,7 @@ import { getClientIp } from '@/utils/getClientIp';
 import { quotaMonitor } from '@/services/github/quota-monitor';
 import { refreshPolicy } from '@/services/github/refresh-policy';
 import { refreshRateLimiter } from '@/services/github/refresh-rate-limiter';
+import { logger } from '@/lib/logger';
 
 const SVG_CSP_HEADER =
   "default-src 'none'; style-src 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; connect-src https://fonts.gstatic.com;";
@@ -707,7 +708,10 @@ function buildErrorResponse(error: unknown, parseResult: ParseResult): NextRespo
   }
 
   // 4. Return a 500 Internal Server Error for real crashes
-  console.error('[streak] Unhandled error:', message);
+  logger.error('Unhandled error', {
+    source: 'streak',
+    message,
+  });
 
   const errorSvg = buildInlineErrorSVG('Something went wrong. Please try again later.');
 
