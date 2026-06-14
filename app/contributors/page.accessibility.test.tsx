@@ -23,6 +23,13 @@ vi.mock('./ContributorsClient', () => ({
 describe('ContributorsPage Accessibility', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    global.fetch = vi.fn().mockResolvedValue({
+      ok: true,
+      json: async () => [],
+      headers: {
+        get: () => null,
+      },
+    } as unknown as Response);
   });
 
   it('renders the contributors client container', async () => {
