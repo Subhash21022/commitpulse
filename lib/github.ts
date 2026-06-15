@@ -1081,7 +1081,7 @@ async function fetchReposUncached(
  * ORG AGGREGATION & EPIC FEATURES
  * ========================================================================== */
 
-export async function fetchOrgMembers(orgName: string): Promise<string[]> {
+export async function fetchOrgMembers(orgName: string, userToken?: string): Promise<string[]> {
   const encodedOrgName = encodeURIComponent(orgName);
   const allMembers: string[] = [];
   const perPage = 100;
@@ -1092,7 +1092,7 @@ export async function fetchOrgMembers(orgName: string): Promise<string[]> {
     const res = await fetchWithRetry(
       `${GITHUB_REST_URL}/orgs/${encodedOrgName}/members?per_page=${perPage}&page=${page}`,
       {
-        headers: getHeaders(),
+        headers: getHeaders(userToken),
         cache: 'no-store',
       }
     );

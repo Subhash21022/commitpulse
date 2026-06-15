@@ -367,11 +367,18 @@ function buildInsights(runs: CIWorkflowRun[]): CIInsights {
   };
 }
 
-export async function fetchCIAnalytics(username: string): Promise<CIAnalyticsData> {
+export async function fetchCIAnalytics(
+  username: string,
+  userToken?: string
+): Promise<CIAnalyticsData> {
   const cacheKey = `ci-analytics:${username.toLowerCase()}`;
   const CACHE_TTL_MS = 10 * 60 * 1000;
 
-  return cache.getOrSet(cacheKey, async () => fetchCIAnalyticsUncached(username), CACHE_TTL_MS);
+  return cache.getOrSet(
+    cacheKey,
+    async () => fetchCIAnalyticsUncached(username, userToken),
+    CACHE_TTL_MS
+  );
 }
 
 async function fetchCIAnalyticsUncached(
