@@ -393,11 +393,14 @@ export function aggregateCalendars(
     return { totalContributions: 0, weeks: [] };
   }
 
-  // Deep clone the base calendar so we don't mutate the original object.
-  // Uses structuredClone() (native in Node 18+) instead of the
-  // JSON.parse(JSON.stringify()) anti-pattern which silently drops
-  // undefined values and Date objects during serialization.
-  const aggregatedBase = structuredClone(baseCalendar);
+  // manual clone is way faster than structuredClone for huge nested arrays
+  const aggregatedBase: ContributionCalendar = {
+    ...baseCalendar,
+    weeks: (baseCalendar.weeks || []).map((w) => ({
+      ...w,
+      contributionDays: (w?.contributionDays || []).map((d) => ({ ...d })),
+    })),
+  };
 
   aggregatedBase.totalContributions = totalContributions;
 
