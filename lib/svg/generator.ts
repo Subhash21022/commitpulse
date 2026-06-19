@@ -1428,9 +1428,11 @@ function renderHeatmapGrid(
         day.date === todayDate ||
         (!todayInWindow && col === weeks.length - 1 && row === week.contributionDays.length - 1);
 
-      const unit = mode === 'loc' ? 'lines of code' : 'contributions';
+      const [yr, m, d] = day.date.split('-');
+      const formattedDate = `${MONTH_NAMES[parseInt(m, 10) - 1]} ${parseInt(d, 10)}`;
+      const unit = mode === 'loc' ? 'lines of code' : 'commits';
       const tooltipPrefix = isToday ? 'TODAY: ' : '';
-      const tooltip = `${tooltipPrefix}${day.date}: ${count} ${unit}`;
+      const tooltip = `${tooltipPrefix}${formattedDate}: ${count} ${unit}`;
 
       const fillAttr = isAutoTheme ? 'fill="var(--cp-accent)"' : `fill="${accent}"`;
 
