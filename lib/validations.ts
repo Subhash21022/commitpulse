@@ -378,6 +378,7 @@ const baseStreakParamsSchema = z.object({
       'radar',
       'doughnut',
       'pie',
+      'activity_graph',
       'commit_clock',
       'activity_graph',
     ])

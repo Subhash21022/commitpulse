@@ -2312,63 +2312,104 @@ export async function getWrappedData(
   };
 }
 
-/**
- * Fetches real commit timestamps from a user's top contributed repos
- * and aggregates them into a 24-element array (index = hour 0–23, UTC).
- * Uses up to `maxRepos` repos to stay within rate limits.
- */
 export async function fetchCommitHourDistribution(
   username: string,
-  repoNames: string[],
-  options: FetchOptions = {}
+  token?: string
 ): Promise<number[]> {
-  const hourCounts = new Array<number>(24).fill(0);
-  const maxRepos = Math.min(repoNames.length, 5);
-  const targets = repoNames.slice(0, maxRepos);
+  const hourCounts = new Array(24).fill(0);
 
-  await runCappedConcurrency(targets, 3, async (repo) => {
-    const query = `
-      query($owner: String!, $repo: String!) {
-        repository(owner: $owner, name: $repo) {
-          defaultBranchRef {
-            target {
-              ... on Commit {
-                history(first: 100) {
-                  nodes {
-                    committedDate
-                  }
+  // Fetch top repos by contribution count
+  const query = `
+    query($login: String!) {
+      user(login: $login) {
+        contributionsCollection {
+          commitContributionsByRepository(maxRepositories: 5) {
+            repository {
+              name
+              owner { login }
+            }
+            contributions {
+              totalCount
+            }
+          }
+        }
+      }
+    }
+  `;
+
+  let topRepos: { owner: string; name: string }[] = [];
+  try {
+    const res = await fetchGraphQLWithRetry(
+      GITHUB_GRAPHQL_URL,
+      {
+        method: 'POST',
+        headers: getHeaders(token),
+        body: JSON.stringify({ query, variables: { login: username } }),
+        cache: 'no-store',
+      },
+      0,
+      undefined,
+      token
+    );
+    if (res.ok) {
+      const data = await res.json();
+      const repos =
+        data?.data?.user?.contributionsCollection?.commitContributionsByRepository ?? [];
+      topRepos = repos.map((r: { repository: { owner: { login: string }; name: string } }) => ({
+        owner: r.repository.owner.login,
+        name: r.repository.name,
+      }));
+    }
+  } catch {
+    // silent — return empty distribution
+  }
+
+  if (topRepos.length === 0) return hourCounts;
+
+  const commitQuery = `
+    query($owner: String!, $name: String!) {
+      repository(owner: $owner, name: $name) {
+        defaultBranchRef {
+          target {
+            ... on Commit {
+              history(first: 100) {
+                nodes {
+                  committedDate
                 }
               }
             }
           }
         }
       }
-    `;
+    }
+  `;
+
+  await runCappedConcurrency(topRepos, 3, async ({ owner, name }) => {
     try {
       const res = await fetchGraphQLWithRetry(
         GITHUB_GRAPHQL_URL,
         {
           method: 'POST',
-          headers: getHeaders(options.token),
-          body: JSON.stringify({ query, variables: { owner: username, repo } }),
+          headers: getHeaders(token),
+          body: JSON.stringify({ query: commitQuery, variables: { owner, name } }),
           cache: 'no-store',
-          signal: options.signal,
         },
         0,
         undefined,
-        options.token
+        token
       );
-      if (!res.ok) return;
+      if (!res.ok) return null;
       const data = await res.json();
       const nodes: { committedDate: string }[] =
         data?.data?.repository?.defaultBranchRef?.target?.history?.nodes ?? [];
-      for (const { committedDate } of nodes) {
-        const hour = new Date(committedDate).getUTCHours();
+      for (const node of nodes) {
+        const hour = new Date(node.committedDate).getUTCHours();
         hourCounts[hour]++;
       }
     } catch {
-      // silently skip repos that fail
+      // skip unavailable repos
     }
+    return null;
   });
 
   return hourCounts;

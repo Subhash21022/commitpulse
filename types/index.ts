@@ -278,7 +278,7 @@ export interface BadgeParams {
   /** Language/locale code for stat labels (e.g. 'en', 'fr', 'ja'). Defaults to 'en'. */
   lang?: string;
 
-  /** Badge layout variant. 'default' shows the isometric monolith; 'monthly' shows month-over-month stats; 'heatmap' shows a flat 2D contribution heatmap; 'pulse' shows a heartbeat sparkline; 'skyline' shows a city skyline; 'languages' shows a 3D isometric city of top programming languages; 'constellation' shows a celestial star-map SVG visualization; 'radar' shows a radar chart of contribution metrics; 'commit_clock' shows a 24-hour polar ring of real commit frequency. */
+  /** Badge layout variant. 'default' shows the isometric monolith; 'monthly' shows month-over-month stats; 'heatmap' shows a flat 2D contribution heatmap; 'pulse' shows a heartbeat sparkline; 'skyline' shows a city skyline; 'languages' shows a 3D isometric city of top programming languages; 'constellation' shows a celestial star-map SVG visualization; 'radar' shows a radar chart of contribution metrics. */
   view?:
     | 'default'
     | 'monthly'
@@ -290,6 +290,7 @@ export interface BadgeParams {
     | 'radar'
     | 'doughnut'
     | 'pie'
+    | 'activity_graph'
     | 'commit_clock';
     | 'activity_graph';
 
