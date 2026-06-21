@@ -181,7 +181,6 @@ export async function GET(request: Request) {
       | 'pie'
       | 'activity_graph'
       | 'commit_clock';
-      | 'activity_graph';
     const themeName = theme || 'dark';
 
     const ip = getClientIp(request);
@@ -572,9 +571,6 @@ export async function GET(request: Request) {
       const stats = calculateStreak(calendar, timezone, undefined, grace);
       const hourCounts = await fetchCommitHourDistribution(user).catch(() => new Array(24).fill(0));
       svg = generateCommitClockSVG(hourCounts, stats, params);
-    } else if (normalizedView === 'activity_graph') {
-      const stats = calculateStreak(calendar, timezone, undefined, grace);
-      svg = generateActivityGraphSVG(stats, params, calendar);
     } else if (versus && versusCalendar) {
       // Normalize both calendars to the target timezone for accurate comparison
       const normalizedCalendar = normalizeCalendarToTimezone(calendar, timezone);

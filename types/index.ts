@@ -292,7 +292,6 @@ export interface BadgeParams {
     | 'pie'
     | 'activity_graph'
     | 'commit_clock';
-    | 'activity_graph';
 
   /** Format for the monthly delta indicator. 'percent' shows %, 'absolute' shows raw count, 'both' shows both. */
   delta_format?: 'percent' | 'absolute' | 'both';
