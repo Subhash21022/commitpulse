@@ -8,14 +8,20 @@ interface RateLimitResult {
 }
 
 /**
- * In-memory rate limiter to prevent basic DoS/spam (Denial of Wallet).
+ * Rate limiter to prevent basic DoS/spam (Denial of Wallet).
  *
- * Note: In a serverless environment, this resets per cold-start/instance,
- * but it is highly effective at stopping aggressive single-instance spikes.
- * For multi-instance strict syncing, a Redis store (Vercel KV/Upstash) should be used.
+ * When Upstash Redis / Vercel KV is configured (KV_REST_API_URL + KV_REST_API_TOKEN
+ * environment variables), rate limit state is persisted across restarts and shared
+ * across all serverless instances via atomic INCR + EXPIRE operations.
+ *
+ * Falls back to an in-memory TTL cache when KV is not configured. In this mode,
+ * state resets on cold start / server restart, but it is highly effective at
+ * stopping aggressive single-instance spikes during normal operation.
+ *
+ * @see https://upstash.com/docs/rate-limiting/quickstart for KV setup instructions.
  */
 export class RateLimiter {
-  private cache: DistributedCache<number>;
+  private cache: DistributedCache<{ count: number; resetAt: number }>;
   private limit: number;
   private windowMs: number;
   private allowlist = new Set<string>();
@@ -23,14 +29,14 @@ export class RateLimiter {
 
   /**
    * Creates a new RateLimiter instance.
-   *
+   *clean
    * @param limit - Maximum number of requests allowed per window. Defaults to 5.
    * @param windowMs - Time window in milliseconds. Defaults to 60000 (1 minute).
    */
-  constructor(limit = 5, windowMs = 60000) {
+  constructor(limit = 5, windowMs = 60000, maxSize = 10000) {
     this.limit = limit;
     this.windowMs = windowMs;
-    this.cache = new DistributedCache<number>(10000, windowMs);
+    this.cache = new DistributedCache<{ count: number; resetAt: number }>(maxSize, windowMs);
   }
 
   /**
@@ -48,11 +54,10 @@ export class RateLimiter {
    * }
    */
   async check(ip: string): Promise<boolean> {
-    if (this.allowlist.has(ip)) return true;
-    if (this.blocklist.has(ip)) return false;
-    const count = await this.cache.incr(`ratelimit:${ip}`, this.windowMs);
-    return count <= this.limit;
+    const result = await this.checkWithResult(ip);
+    return result.success;
   }
+
   async checkWithResult(ip: string): Promise<RateLimitResult> {
     if (this.allowlist.has(ip))
       return {
@@ -65,24 +70,87 @@ export class RateLimiter {
       return { success: false, limit: this.limit, remaining: 0, reset: Date.now() + this.windowMs };
 
     const now = Date.now();
+    const url = process.env.KV_REST_API_URL;
+    const token = process.env.KV_REST_API_TOKEN;
+
+    if (url && token) {
+      try {
+        const getRes = await fetch(`${url}/pipeline`, {
+          method: 'POST',
+          headers: {
+            Authorization: `Bearer ${token}`,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify([
+            ['GET', `ratelimit_class:${ip}`],
+            ['TTL', `ratelimit_class:${ip}`],
+          ]),
+        });
+
+        if (getRes.ok) {
+          const getData = await getRes.json();
+          const currentCount = parseInt(getData[0].result ?? '0', 10);
+          const ttl = getData[1].result as number;
+
+          if (currentCount >= this.limit) {
+            return {
+              success: false,
+              limit: this.limit,
+              remaining: 0,
+              reset: ttl > 0 ? now + ttl * 1000 : now + this.windowMs,
+            };
+          }
+
+          const incrRes = await fetch(`${url}/pipeline`, {
+            method: 'POST',
+            headers: {
+              Authorization: `Bearer ${token}`,
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify([
+              ['INCR', `ratelimit_class:${ip}`],
+              ['EXPIRE', `ratelimit_class:${ip}`, Math.floor(this.windowMs / 1000), 'NX'],
+            ]),
+          });
+
+          if (incrRes.ok) {
+            const incrData = await incrRes.json();
+            const count = incrData[0].result as number;
+            return {
+              success: count <= this.limit,
+              limit: this.limit,
+              remaining: Math.max(0, this.limit - count),
+              reset: now + this.windowMs,
+            };
+          }
+        }
+      } catch (error) {
+        console.error('RateLimiter KV error, falling back to memory:', error);
+      }
+    }
+
+    // Atomic increment to avoid TOCTOU race condition where concurrent requests
+    // all read count=0 and all proceed past the limit check.
     const count = await this.cache.incr(`ratelimit:${ip}`, this.windowMs);
+    const resetAt = now + this.windowMs;
 
     if (count > this.limit) {
       return {
         success: false,
         limit: this.limit,
         remaining: 0,
-        reset: now + this.windowMs,
+        reset: resetAt,
       };
     }
 
     return {
       success: true,
       limit: this.limit,
-      remaining: this.limit - count,
-      reset: now + this.windowMs,
+      remaining: Math.max(0, this.limit - count),
+      reset: resetAt,
     };
   }
+
   /**
    * Resets the request count for a given IP address.
    *
@@ -95,8 +163,27 @@ export class RateLimiter {
    * rateLimiter.reset("192.168.1.1");
    */
   async reset(ip: string): Promise<void> {
+    const url = process.env.KV_REST_API_URL;
+    const token = process.env.KV_REST_API_TOKEN;
+
+    if (url && token) {
+      try {
+        await fetch(`${url}/pipeline`, {
+          method: 'POST',
+          headers: {
+            Authorization: `Bearer ${token}`,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify([['DEL', `ratelimit_class:${ip}`]]),
+        });
+      } catch (error) {
+        console.error('RateLimiter KV reset error:', error);
+      }
+    }
+
     await this.cache.delete(`ratelimit:${ip}`);
   }
+
   /**
    * Returns the number of remaining requests allowed for a given IP
    * in the current window.
@@ -112,8 +199,8 @@ export class RateLimiter {
    * console.log(`You have ${left} requests left.`);
    */
   async remaining(ip: string): Promise<number> {
-    const current = ((await this.cache.get(`ratelimit:${ip}`)) as unknown as number) ?? 0;
-    return Math.max(0, this.limit - current);
+    const count = ((await this.cache.get(`ratelimit:${ip}`)) as unknown as number) ?? 0;
+    return Math.max(0, this.limit - count);
   }
 
   allow(ip: string): void {
@@ -149,7 +236,7 @@ export const notifyRateLimiter = new RateLimiter(5, 60000);
  * Falls back to a local in-memory cache for development environments.
  */
 
-const trackers = new DistributedCache<number>(2000, 60000);
+const trackers = new DistributedCache<{ count: number; resetAt: number }>(2000, 60000);
 
 /**
  * Checks if a request from a given IP should be rate limited.
@@ -170,22 +257,61 @@ export async function rateLimit(
   limit: number = 60,
   windowMs: number = 60000
 ): Promise<RateLimitResult> {
-  const now = Date.now();
-  const count = await trackers.incr(ip, windowMs);
-
-  if (count > limit) {
-    return {
-      success: false,
-      limit,
-      remaining: 0,
-      reset: now + windowMs,
-    };
+  if (!ip || ip.trim().length === 0) {
+    throw new TypeError('Cache key cannot be empty');
   }
 
+  const now = Date.now();
+  const url = process.env.KV_REST_API_URL;
+  const token = process.env.KV_REST_API_TOKEN;
+
+  // Use Upstash Redis if configured
+  if (url && token) {
+    try {
+      const res = await fetch(`${url}/pipeline`, {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify([
+          ['INCR', `ratelimit:${ip}`],
+          ['EXPIRE', `ratelimit:${ip}`, Math.floor(windowMs / 1000), 'NX'],
+        ]),
+      });
+
+      if (res.ok) {
+        const data = await res.json();
+        const count = data[0].result as number;
+        return {
+          success: count <= limit,
+          limit,
+          remaining: Math.max(0, limit - count),
+          reset: now + windowMs, // Approximated for simplicity
+        };
+      }
+    } catch (error) {
+      console.error('Rate limit KV error, falling back to memory:', error);
+    }
+  }
+
+  // Atomic increment to avoid TOCTOU race condition where concurrent requests
+  // all read count=0 and all proceed past the limit check.
+  const count = await trackers.incr(`ratelimit:${ip}`, windowMs);
+  const resetAt = now + windowMs;
+
   return {
-    success: true,
+    success: count <= limit,
     limit,
-    remaining: limit - count,
-    reset: now + windowMs,
+    remaining: Math.max(0, limit - count),
+    reset: resetAt,
+  };
+}
+
+export function getRateLimitHeaders(result: RateLimitResult) {
+  return {
+    'X-RateLimit-Limit': result.limit.toString(),
+    'X-RateLimit-Remaining': result.remaining.toString(),
+    'X-RateLimit-Reset': result.reset.toString(),
   };
 }
