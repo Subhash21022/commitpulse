@@ -580,7 +580,8 @@ function renderTowers(
       const vy = rnd(-hOffset * 0.35);
       const shadowPath = `M${cx_sf} ${cy_sf} L${bx_sf} ${by_sf} L${rnd(bx_sf + vx)} ${rnd(by_sf + vy)} L${rnd(ax_sf + vx)} ${rnd(ay_sf + vy)} L${rnd(dx_sf + vx)} ${rnd(dy_sf + vy)} L${dx_sf} ${dy_sf} Z`;
       const shadowColor = isAutoTheme ? 'var(--cp-negative, #000000)' : '#000000';
-      shadowMarkup = `<path d="${shadowPath}" fill="${shadowColor}" fill-opacity="0.15" />`;
+      const shadowOpacity = parseFloat((0.15 * opacity).toFixed(2));
+      shadowMarkup = `<path d="${shadowPath}" fill="${shadowColor}" fill-opacity="${shadowOpacity}" />`;
     }
 
     towers += `
