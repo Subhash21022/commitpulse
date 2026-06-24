@@ -186,6 +186,7 @@ export function calculateStreak(
 
   if (todayIndex < 0) {
     const lastIndex = uniqueDays.length - 1;
+
     if (lastIndex < 0) {
       return {
         currentStreak: 0,
@@ -198,11 +199,13 @@ export function calculateStreak(
     const lastDateStr = uniqueDays[lastIndex]?.date;
 
     if (lastDateStr && localTodayStr > lastDateStr) {
-      const gapDays = getDayDifference(lastDateStr, localTodayStr);
+      const gapDays = Math.floor(
+        (new Date(localTodayStr).getTime() - new Date(lastDateStr).getTime()) / 86400000
+      );
 
-      if (gapDays <= Math.max(1, grace)) {
-        todayIndex = lastIndex;
-      } else {
+      // Issue #6171:
+      // only reject when today is missing AND gap > grace
+      if (gapDays > Math.max(1, grace)) {
         return {
           currentStreak: 0,
           longestStreak,
@@ -210,6 +213,8 @@ export function calculateStreak(
           todayDate: localTodayStr,
         };
       }
+
+      todayIndex = lastIndex;
     } else {
       return {
         currentStreak: 0,
