@@ -7,8 +7,11 @@ import {
   calculateStreak,
   calculateMonthlyStats,
   aggregateCalendars,
+  convertLocalToUtc,
   chunkDaysIntoWeeks,
   normalizeCalendarToTimezone,
+  isLeapYear,
+  daysInYear,
 } from '@/lib/calculate';
 import {
   generateNotFoundSVG,
@@ -478,15 +481,24 @@ export async function GET(request: Request) {
       clearTimeout(timeoutId);
     }
 
-    if (days && normalizedView !== 'monthly') {
-      const allDays = calendar.weeks.flatMap((w) => w.contributionDays);
+    if (normalizedView !== 'monthly') {
+      let effectiveDays = days;
 
-      const filteredDays = allDays.slice(-days);
+      if (!effectiveDays && year) {
+        const yearNum = parseInt(year, 10);
+        if (!isNaN(yearNum)) {
+          effectiveDays = daysInYear(yearNum);
+        }
+      }
 
-      calendar = {
-        totalContributions: filteredDays.reduce((sum, d) => sum + d.contributionCount, 0),
-        weeks: chunkDaysIntoWeeks(filteredDays),
-      };
+      if (effectiveDays) {
+        const allDays = calendar.weeks.flatMap((w) => w.contributionDays);
+        const filteredDays = allDays.slice(-effectiveDays);
+        calendar = {
+          totalContributions: filteredDays.reduce((sum, d) => sum + d.contributionCount, 0),
+          weeks: chunkDaysIntoWeeks(filteredDays),
+        };
+      }
     }
 
     // ─── JSON output mode ──────────────────────────────────────────────────
