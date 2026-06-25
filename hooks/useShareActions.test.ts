@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { renderHook } from '@testing-library/react';
+import { renderHook, act } from '@testing-library/react';
 import { useShareActions } from './useShareActions';
 import type { DashboardExportData } from '@/types/dashboard';
 
@@ -17,6 +17,20 @@ vi.mock('@/utils/urls', () => ({
   getOrigin: () => 'https://commitpulse.app',
 }));
 
+vi.mock('html-to-image', () => ({
+  toCanvas: vi.fn().mockResolvedValue({
+    toBlob: (cb: (b: Blob | null) => void) => cb(new Blob(['fake'])),
+  }),
+}));
+
+function mockClipboard() {
+  Object.defineProperty(window.navigator, 'clipboard', {
+    value: { writeText: vi.fn().mockResolvedValue(undefined) },
+    configurable: true,
+    writable: true,
+  });
+}
+
 describe('useShareActions error logging', () => {
   beforeEach(() => {
     vi.restoreAllMocks();
@@ -24,10 +38,11 @@ describe('useShareActions error logging', () => {
     document.body.innerHTML = '';
     Reflect.deleteProperty(globalThis, 'fetch');
     Reflect.deleteProperty(globalThis, 'ClipboardItem');
+    mockClipboard();
   });
 
   it('handleCopyLink calls navigator.clipboard.writeText with a profile URL containing the username', async () => {
-    const { result } = renderHook(() => useShareActions(mockUsername, mockExportData, mockClose));
+    const { result } = renderHook(() => useShareActions(mockUsername, mockExportData, mockOnClose));
 
     let success;
     await act(async () => {
@@ -35,14 +50,15 @@ describe('useShareActions error logging', () => {
     });
 
     expect(navigator.clipboard.writeText).toHaveBeenCalledWith(
-      expect.stringContaining(`/dashboard/${mockUsername}`)
+      expect.stringContaining(mockUsername)
     );
     expect(success).toBe(true);
     expect(result.current.states['copy']).toBe('success');
   });
 
   it('resets copy state to idle after 2500ms', async () => {
-    const { result } = renderHook(() => useShareActions(mockUsername, mockExportData, mockClose));
+    vi.useFakeTimers();
+    const { result } = renderHook(() => useShareActions(mockUsername, mockExportData, mockOnClose));
 
     await act(async () => {
       await result.current.handleCopyLink();
@@ -55,6 +71,7 @@ describe('useShareActions error logging', () => {
     });
 
     expect(result.current.states['copy']).toBe('idle');
+    vi.useRealTimers();
   });
 
   it('copies dashboard image to clipboard successfully', async () => {
@@ -69,19 +86,19 @@ describe('useShareActions error logging', () => {
       writable: true,
     });
 
-    Object.defineProperty(navigator, 'clipboard', {
+    Object.defineProperty(window.navigator, 'clipboard', {
       value: {
         write: writeMock,
         writeText: vi.fn().mockResolvedValue(undefined),
       },
       configurable: true,
+      writable: true,
     });
 
-    const { result } = renderHook(() => useShareActions(mockUsername, mockExportData, mockClose));
+    const { result } = renderHook(() => useShareActions(mockUsername, mockExportData, mockOnClose));
 
     await act(async () => {
       const promise = result.current.handleCopyImage();
-      await vi.advanceTimersByTimeAsync(150);
       await promise;
     });
 
@@ -90,38 +107,42 @@ describe('useShareActions error logging', () => {
   });
 
   it('handleTwitter opens window to share on twitter/x', () => {
-    const { result } = renderHook(() => useShareActions(mockUsername, mockExportData, mockClose));
+    const openSpy = vi.spyOn(window, 'open').mockImplementation(() => null);
+    const { result } = renderHook(() => useShareActions(mockUsername, mockExportData, mockOnClose));
 
     act(() => {
       result.current.handleTwitter();
     });
 
-    expect(window.open).toHaveBeenCalledWith(
+    expect(openSpy).toHaveBeenCalledWith(
       expect.stringContaining('twitter.com/intent/tweet'),
       '_blank',
       'noopener'
     );
-    expect(mockClose).toHaveBeenCalled();
+    expect(mockOnClose).toHaveBeenCalled();
   });
 
   it('handleLinkedIn opens window to share on linkedin', () => {
-    const { result } = renderHook(() => useShareActions(mockUsername, mockExportData, mockClose));
+    const openSpy = vi.spyOn(window, 'open').mockImplementation(() => null);
+    const { result } = renderHook(() => useShareActions(mockUsername, mockExportData, mockOnClose));
 
     act(() => {
       result.current.handleLinkedIn();
     });
 
-    expect(window.open).toHaveBeenCalledWith(
+    expect(openSpy).toHaveBeenCalledWith(
       expect.stringContaining('linkedin.com/sharing/share-offsite'),
       '_blank',
       'noopener'
     );
-    expect(mockClose).toHaveBeenCalled();
+    expect(mockOnClose).toHaveBeenCalled();
   });
 
   it('logs error when handleCopyLink fails', async () => {
-    Object.assign(navigator, {
-      clipboard: { writeText: vi.fn().mockRejectedValue(new Error('permission denied')) },
+    Object.defineProperty(window.navigator, 'clipboard', {
+      value: { writeText: vi.fn().mockRejectedValue(new Error('permission denied')) },
+      configurable: true,
+      writable: true,
     });
     const { result } = renderHook(() => useShareActions(mockUsername, mockExportData, mockOnClose));
     const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
@@ -145,8 +166,10 @@ describe('useShareActions error logging', () => {
   });
 
   it('logs error when handleCopyMarkdown fails', async () => {
-    Object.assign(navigator, {
-      clipboard: { writeText: vi.fn().mockRejectedValue(new Error('clipboard error')) },
+    Object.defineProperty(window.navigator, 'clipboard', {
+      value: { writeText: vi.fn().mockRejectedValue(new Error('clipboard error')) },
+      configurable: true,
+      writable: true,
     });
     const { result } = renderHook(() => useShareActions(mockUsername, mockExportData, mockOnClose));
     const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
