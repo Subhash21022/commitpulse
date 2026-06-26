@@ -123,7 +123,7 @@ describe('GitHub API Route - Massive Data Sets and High Bounds Scaling', () => {
           svgText = text;
         }
       }
-    } catch (e: unknown) {
+    } catch {
       // Ignored to strictly evaluate the bounding logic assertions below
     }
 
