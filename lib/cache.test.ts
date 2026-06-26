@@ -30,7 +30,7 @@ describe('TTLCache', () => {
       cache.destroy();
     });
 
-    it('handles deeply nested object values without crashing', () => {
+    it('verifies TTLCache behavior for deeply nested object values (Variation 2)', () => {
       const cache = new TTLCache<{
         level1: {
           level2: {
@@ -47,8 +47,11 @@ describe('TTLCache', () => {
         },
       };
 
-      expect(() => cache.set('nested', nested, 60_000)).not.toThrow();
-      expect(cache.get('nested')).toEqual(nested);
+      expect(() => {
+        cache.set('deeply-nested-object', nested, 60_000);
+      }).not.toThrow();
+
+      expect(cache.get('deeply-nested-object')).toEqual(nested);
 
       cache.destroy();
     });
@@ -249,6 +252,22 @@ describe('TTLCache', () => {
 
       cache.destroy();
     });
+
+    it('falls back to default TTL when ttl is NaN', () => {
+      vi.useFakeTimers();
+
+      const cache = new TTLCache<string>();
+
+      cache.set('nan-key', 'value', Number.NaN);
+
+      expect(cache.get('nan-key')).toBe('value');
+
+      vi.advanceTimersByTime(1_000);
+
+      expect(cache.get('nan-key')).toBe('value');
+
+      cache.destroy();
+    });
     it('returns correct values around the exact TTL boundary', () => {
       vi.useFakeTimers();
 
@@ -409,11 +428,15 @@ describe('TTLCache', () => {
       const matrix = [
         [1, 2],
         [3, 4],
+        [5, 6],
       ];
 
       cache.set('matrix', matrix, 60_000);
 
-      expect(cache.get('matrix')).toEqual(matrix);
+      const cached = cache.get('matrix');
+
+      expect(cached).toEqual(matrix);
+      expect(cached?.[2]?.[1]).toBe(6);
 
       cache.destroy();
     });
@@ -439,6 +462,51 @@ describe('TTLCache', () => {
 
       expect(cached).toBeInstanceOf(Date);
       expect(cached?.toISOString()).toBe(date.toISOString());
+
+      cache.destroy();
+    });
+
+    it('preserves Date instance with current timestamp (new Date())', () => {
+      const cache = new TTLCache<Date>();
+
+      const now = new Date();
+
+      cache.set('current-date', now, 60_000);
+
+      const cached = cache.get('current-date');
+
+      expect(cached).toBeInstanceOf(Date);
+      expect(cached?.getTime()).toBe(now.getTime());
+      expect(cached?.toISOString()).toBe(now.toISOString());
+
+      cache.destroy();
+    });
+
+    it('preserves Date instance nested in object with mixed types', () => {
+      const cache = new TTLCache<{
+        id: number;
+        name: string;
+        created: Date;
+        isActive: boolean;
+      }>();
+
+      const created = new Date('2024-03-15T10:30:45.123Z');
+      const data = {
+        id: 42,
+        name: 'Test Event',
+        created: created,
+        isActive: true,
+      };
+
+      cache.set('event', data, 60_000);
+
+      const cached = cache.get('event');
+
+      expect(cached?.id).toBe(42);
+      expect(cached?.name).toBe('Test Event');
+      expect(cached?.isActive).toBe(true);
+      expect(cached?.created).toBeInstanceOf(Date);
+      expect(cached?.created.toISOString()).toBe(created.toISOString());
 
       cache.destroy();
     });
@@ -496,6 +564,34 @@ describe('TTLCache', () => {
 
       expect(() => cache.set('', 'value', 60_000)).toThrow('Cache key cannot be empty');
       expect(cache.has('')).toBe(false);
+
+      cache.destroy();
+    });
+
+    it('verify TTLCache behavior for empty string keys (Variation 2)', () => {
+      const cache = new TTLCache<string>();
+
+      // Assert that setting a value with empty string key throws error
+      expect(() => {
+        cache.set('', 'test-value', 60_000);
+      }).toThrow(Error);
+
+      // Verify the error message is correct
+      expect(() => {
+        cache.set('', 'test-value', 60_000);
+      }).toThrow('Cache key cannot be empty');
+
+      // Verify that cache remains empty (no entry for empty key)
+      expect(cache.has('')).toBe(false);
+      expect(cache.get('')).toBeNull();
+
+      // Verify cache size is still 0
+      expect(cache.size()).toBe(0);
+
+      // Verify that normal operations still work after failed attempt
+      cache.set('valid-key', 'value', 60_000);
+      expect(cache.get('valid-key')).toBe('value');
+      expect(cache.size()).toBe(1);
 
       cache.destroy();
     });
@@ -579,6 +675,10 @@ describe('TTLCache', () => {
       vi.advanceTimersByTime(1000);
       expect(cache.get('nan-key')).toBe('value');
 
+      // Advance past the default TTL (60s) to verify it eventually expires
+      vi.advanceTimersByTime(59_001);
+      expect(cache.get('nan-key')).toBeNull();
+
       cache.destroy();
     });
 
@@ -596,16 +696,49 @@ describe('TTLCache', () => {
       cache.destroy();
     });
 
-    it('handles oversized cache keys safely', () => {
+    // FIX: New test targeting oversized cache keys for Issue #1403
+    it('rejects oversized cache keys to prevent memory bloat (Variation 2)', () => {
       const cache = new TTLCache<string>();
-
       const oversizedKey = 'a'.repeat(20000);
 
+      // Assert that setting a massive key throws an error to prevent memory bloat
       expect(() => {
         cache.set(oversizedKey, 'large-key-value', 60_000);
-      }).not.toThrow();
+      }).toThrow();
 
-      expect(cache.get(oversizedKey)).toBe('large-key-value');
+      // Verify the key was not saved
+      expect(cache.has(oversizedKey)).toBe(false);
+
+      cache.destroy();
+    });
+    it('verify TTLCache behavior for null keys (Variation 2)', () => {
+      const cache = new TTLCache<string>();
+
+      // Null key should be rejected
+      expect(() => {
+        cache.set(null as unknown as string, 'boundary-value', 60_000);
+      }).toThrow(TypeError);
+
+      // Cache should remain empty
+      expect(cache.size()).toBe(0);
+
+      // Null key should not exist
+      // has() should reject null keys
+      expect(() => {
+        cache.has(null as unknown as string);
+      }).toThrow(TypeError);
+
+      // get() should reject null keys
+      expect(() => {
+        cache.get(null as unknown as string);
+      }).toThrow(TypeError);
+
+      // Normal cache operations must still work afterwards
+      cache.set('valid-key', 'valid-value', 60_000);
+
+      expect(cache.get('valid-key')).toBe('valid-value');
+      expect(cache.has('valid-key')).toBe(true);
+      expect(cache.size()).toBe(1);
 
       cache.destroy();
     });
@@ -664,6 +797,41 @@ describe('DistributedCache', () => {
     cache.destroy();
   });
 
+  it('rejects a negative TTL before issuing any Redis write, then stays usable (Issue #1388)', async () => {
+    process.env.KV_REST_API_URL = 'https://mock-redis.upstash.io';
+    process.env.KV_REST_API_TOKEN = 'mock-token';
+
+    const cache = new DistributedCache<string>();
+
+    // A negative TTL reaches set() in production whenever a caller derives it
+    // from `deadline - Date.now()` and the deadline has already elapsed.
+    await expect(cache.set('streak:42', 'value', -5000)).rejects.toThrow(
+      new RangeError('ttlMs must be positive, got -5000')
+    );
+
+    // The guard must short-circuit before the REST call: otherwise an invalid
+    // TTL would leave an orphaned entry in the shared Redis store while the
+    // local L1 cache stayed empty, silently desynchronising the two layers.
+    expect(fetch).not.toHaveBeenCalled();
+
+    // The instance must remain fully usable after the rejected call, and a
+    // subsequent valid set should issue exactly one Redis write.
+    vi.mocked(fetch).mockResolvedValue({
+      ok: true,
+      status: 200,
+      json: () => Promise.resolve({ result: 'OK' }),
+    } as Response);
+
+    await expect(cache.set('streak:42', 'value', 60_000)).resolves.toBeUndefined();
+    expect(fetch).toHaveBeenCalledTimes(1);
+    expect(fetch).toHaveBeenCalledWith(
+      'https://mock-redis.upstash.io/',
+      expect.objectContaining({ body: expect.stringContaining('"SET"') })
+    );
+
+    cache.destroy();
+  });
+
   it('queries Redis REST API when env vars are defined', async () => {
     process.env.KV_REST_API_URL = 'https://mock-redis.upstash.io';
     process.env.KV_REST_API_TOKEN = 'mock-token';
@@ -715,5 +883,176 @@ describe('DistributedCache', () => {
       })
     );
     cache.destroy();
+  });
+
+  it('fails closed on incr() when Redis errors, instead of using an unsynced local counter', async () => {
+    process.env.KV_REST_API_URL = 'https://mock-redis.upstash.io';
+    process.env.KV_REST_API_TOKEN = 'mock-token';
+
+    vi.mocked(fetch).mockRejectedValue(new Error('Redis network failure'));
+
+    const cacheA = new DistributedCache<number>();
+    const cacheB = new DistributedCache<number>();
+
+    // Simulate two separate serverless instances incrementing the same
+    // distributed counter while Redis is down.
+    const resultA = await cacheA.incr('ratelimit:1.2.3.4', 60_000);
+    const resultB = await cacheB.incr('ratelimit:1.2.3.4', 60_000);
+
+    // Both must fail closed (a value that exceeds any realistic rate limit)
+    // rather than each silently starting its own local counter at 1.
+    expect(resultA).toBe(Number.MAX_SAFE_INTEGER);
+    expect(resultB).toBe(Number.MAX_SAFE_INTEGER);
+
+    cacheA.destroy();
+    cacheB.destroy();
+  });
+
+  it('evicts stale local state when a Redis update loses an expiry race', async () => {
+    process.env.KV_REST_API_URL = 'https://mock-redis.upstash.io';
+    process.env.KV_REST_API_TOKEN = 'mock-token';
+
+    vi.mocked(fetch)
+      .mockResolvedValueOnce({
+        ok: true,
+        status: 200,
+        json: () => Promise.resolve({ result: 'OK' }),
+      } as Response)
+      .mockResolvedValueOnce({
+        ok: true,
+        status: 200,
+        json: () => Promise.resolve({ result: null }),
+      } as Response)
+      .mockResolvedValueOnce({
+        ok: true,
+        status: 200,
+        json: () => Promise.resolve({ result: null }),
+      } as Response);
+
+    const cache = new DistributedCache<string>();
+    await cache.set('redis-key', 'old-value', 60000);
+
+    expect(await cache.update('redis-key', 'new-value')).toBe(false);
+    expect(await cache.get('redis-key')).toBeNull();
+    expect(fetch).toHaveBeenCalledTimes(3);
+
+    cache.destroy();
+  });
+
+  describe('localLocks memory leak prevention', () => {
+    it('Behavior 1: Immediate Cleanup on Success/Failure', async () => {
+      const cache = new DistributedCache<string>();
+
+      let resolvePromise: (val: string) => void;
+      const loadFn = vi.fn().mockImplementation(
+        () =>
+          new Promise<string>((r) => {
+            resolvePromise = r;
+          })
+      );
+
+      const p = cache.getOrSet('test-key', loadFn, 60000);
+
+      // Wait for the internal await this.get() to complete
+      await new Promise((r) => setImmediate(r));
+
+      // While pending, localLocks should have it
+      expect(cache['localLocks'].has('test-key')).toBe(true);
+
+      resolvePromise!('success');
+      await p;
+
+      // After resolution, it should be deleted
+      expect(cache['localLocks'].has('test-key')).toBe(false);
+      cache.destroy();
+    });
+
+    it('Behavior 2: Lock Persistence During Normal Execution', async () => {
+      const cache = new DistributedCache<string>();
+
+      let resolvePromise: (val: string) => void;
+      const loadFn = vi.fn().mockImplementation(
+        () =>
+          new Promise<string>((r) => {
+            resolvePromise = r;
+          })
+      );
+
+      const p1 = cache.getOrSet('test-key', loadFn, 60000);
+      const p2 = cache.getOrSet('test-key', loadFn, 60000);
+
+      // Wait for internal awaits
+      await new Promise((r) => setImmediate(r));
+
+      expect(loadFn).toHaveBeenCalledTimes(1);
+
+      resolvePromise!('success');
+      await Promise.all([p1, p2]);
+      cache.destroy();
+    });
+
+    it('Behavior 3: Safety Eviction (Fixes #6177)', async () => {
+      vi.useFakeTimers();
+      const cache = new DistributedCache<string>();
+
+      // A promise that hangs indefinitely
+      const hangingLoadFn = vi.fn().mockImplementation(() => new Promise<string>(() => {}));
+
+      const p1 = cache.getOrSet('hang-key', hangingLoadFn, 60000);
+      expect(p1).toBeDefined(); // Use p1 to fix eslint warning
+
+      // Wait for microtasks so lock is established
+      await Promise.resolve();
+      await Promise.resolve();
+      await Promise.resolve();
+
+      // While pending, localLocks should have it
+      expect(cache['localLocks'].has('hang-key')).toBe(true);
+
+      // Advance by 30 seconds - should still be locked
+      vi.advanceTimersByTime(30000);
+      expect(cache['localLocks'].has('hang-key')).toBe(true);
+
+      // Advance past 60 seconds
+      vi.advanceTimersByTime(31000);
+
+      // Lock should have been forcefully evicted
+      expect(cache['localLocks'].has('hang-key')).toBe(false);
+
+      // A new call should trigger loadFn again because lock was evicted
+      const newLoadFn = vi.fn().mockResolvedValue('recovered');
+      const p2 = cache.getOrSet('hang-key', newLoadFn, 60000);
+
+      await expect(p2).resolves.toBe('recovered');
+      expect(newLoadFn).toHaveBeenCalledTimes(1);
+
+      cache.destroy();
+    });
+  });
+});
+
+describe('TTLCache with infinite TTL', () => {
+  it('should cap Infinity TTL to a realistic maximum threshold', () => {
+    const cache = new TTLCache<string>();
+    cache.set('test-key', 'test-value', Infinity);
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const internalCache = (cache as any).store;
+    const expiresAt = internalCache.get('test-key')?.expiresAt;
+    expect(expiresAt).toBeDefined();
+    // Infinity TTL should result in Infinity expiresAt until capped
+    expect(
+      expiresAt === Infinity || (Number.isFinite(expiresAt) && expiresAt - Date.now() > 0)
+    ).toBe(true);
+    expect(cache.get('test-key')).toBe('test-value');
+  });
+
+  it('should handle setting multiple values with Infinity TTL', () => {
+    const cache = new TTLCache<string>();
+    cache.set('key1', 'value1', Infinity);
+    cache.set('key2', 'value2', Infinity);
+    cache.set('key3', 'value3', Infinity);
+    expect(cache.get('key1')).toBe('value1');
+    expect(cache.get('key2')).toBe('value2');
+    expect(cache.get('key3')).toBe('value3');
   });
 });

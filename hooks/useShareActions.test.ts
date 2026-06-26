@@ -125,7 +125,9 @@ describe('useShareActions', () => {
     const { result } = renderHook(() => useShareActions(mockUsername, mockExportData, mockClose));
 
     await act(async () => {
-      await result.current.handleCopyImage();
+      const promise = result.current.handleCopyImage();
+      await vi.advanceTimersByTimeAsync(150);
+      await promise;
     });
 
     expect(writeMock).toHaveBeenCalled();
@@ -230,6 +232,19 @@ describe('useShareActions', () => {
     });
 
     expect(mockLinkElement.download).toContain(`commitpulse-${mockUsername}-stats.json`);
+    expect(mockLinkElement.href).toBe('blob:mock-url');
+    expect(mockLinkElement.click).toHaveBeenCalled();
+    expect(global.URL.createObjectURL).toHaveBeenCalled();
+  });
+
+  it('handleDownloadSTL generates and initiates download of STL file', () => {
+    const { result } = renderHook(() => useShareActions(mockUsername, mockExportData, mockClose));
+
+    act(() => {
+      result.current.handleDownloadSTL();
+    });
+
+    expect(mockLinkElement.download).toContain(`commitpulse-${mockUsername}-monolith.stl`);
     expect(mockLinkElement.href).toBe('blob:mock-url');
     expect(mockLinkElement.click).toHaveBeenCalled();
     expect(global.URL.createObjectURL).toHaveBeenCalled();

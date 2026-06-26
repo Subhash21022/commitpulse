@@ -16,6 +16,18 @@ describe('getSecondsUntilUTCMidnight', () => {
     expect(getSecondsUntilUTCMidnight()).toBe(86400);
   });
 
+  it('returns 86399 seconds right after UTC midnight (1 second past midnight)', () => {
+    vi.setSystemTime(new Date('2024-06-15T00:00:01.000Z'));
+
+    expect(getSecondsUntilUTCMidnight()).toBe(86399);
+  });
+
+  it('returns 86340 seconds exactly one minute after UTC midnight', () => {
+    vi.setSystemTime(new Date('2024-06-15T00:01:00.000Z'));
+
+    expect(getSecondsUntilUTCMidnight()).toBe(86340);
+  });
+
   it('returns 43200 seconds (12 hours) at UTC noon', () => {
     vi.setSystemTime(new Date('2024-06-15T12:00:00.000Z'));
 
@@ -238,8 +250,8 @@ describe('getSecondsUntilMidnightInTimezone', () => {
   it('should handle extreme timezone offsets without calendar date shifting', () => {
     // Arrange: Test the most extreme offsets to ensure no calendar date shifting occurs
     const extremeOffsets = [
-      { tz: 'Etc/GMT+12', offset: -12, utcHour: 12, expectedLocalHour: 0 }, // UTC-12
-      { tz: 'Etc/GMT-14', offset: 14, utcHour: 10, expectedLocalHour: 0 }, // UTC+14
+      { tz: 'Etc/GMT+12', utcHour: 12 }, // UTC-12
+      { tz: 'Etc/GMT-14', utcHour: 10 }, // UTC+14
     ];
 
     for (const { tz, utcHour } of extremeOffsets) {
@@ -262,6 +274,25 @@ describe('getSecondsUntilUTCMidnight — sliding window boundary robustness', ()
 
   afterEach(() => {
     vi.useRealTimers();
+  });
+
+  it('verifies utility guarantees keys expire exactly at window limit across a sliding range', () => {
+    // Target inputs: Sliding time range approaching midnight in Asia/Kolkata (UTC+5:30)
+    // Local midnight happens at UTC 18:30:00
+    const slidingCases: [string, number][] = [
+      ['2024-06-15T17:30:00.000Z', 3600], // 1 hour before local midnight
+      ['2024-06-15T18:00:00.000Z', 1800], // 30 mins before local midnight
+      ['2024-06-15T18:29:59.000Z', 1], // 1 second before local midnight
+      ['2024-06-15T18:30:00.000Z', 86400], // Exactly local midnight (resets to full day)
+    ];
+
+    for (const [utcTime, expectedTTL] of slidingCases) {
+      vi.setSystemTime(new Date(utcTime));
+      const seconds = getSecondsUntilMidnightInTimezone('Asia/Kolkata');
+
+      // Assert that outputs match guarantees keys expire exactly at window limit
+      expect(seconds).toBe(expectedTTL);
+    }
   });
 
   it('returns correct TTL across a sliding window of times approaching UTC midnight', () => {
@@ -330,5 +361,114 @@ describe('getSecondsUntilMidnightInTimezone — extreme timezone offset boundary
     vi.setSystemTime(new Date('2024-01-01T11:00:00.000Z'));
 
     expect(getSecondsUntilMidnightInTimezone('Pacific/Midway')).toBe(86400);
+  });
+
+  it('throws a RangeError for invalid timezone identifiers', () => {
+    vi.setSystemTime(new Date('2024-06-15T12:00:00.000Z'));
+
+    expect(() => getSecondsUntilMidnightInTimezone('Invalid/Timezone')).toThrow(RangeError);
+  });
+});
+
+describe('getSecondsUntilMidnightInTimezone — Variation 4: extreme offset boundary robustness', () => {
+  beforeEach(() => {
+    vi.useFakeTimers();
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  // Variation 4 focuses on the *trickiest* offset shapes — fractional (quarter-hour)
+  // offsets and month/leap-year boundary crossings — which are historically where
+  // "calendar shifting" bugs surface. Whole-hour and half-hour offsets are already
+  // covered by earlier variations; we deliberately do not duplicate them here.
+
+  it('converts cleanly to a quarter-hour offset at local midnight (Asia/Kathmandu, UTC+5:45)', () => {
+    // UTC 2024-06-14T18:15:00Z == 2024-06-15T00:00:00 in Asia/Kathmandu (UTC+5:45).
+    // At exact local midnight the utility must return a full 86400-second window —
+    // any off-by-one here would indicate a fractional-offset calendar shift.
+    vi.setSystemTime(new Date('2024-06-14T18:15:00.000Z'));
+
+    expect(getSecondsUntilMidnightInTimezone('Asia/Kathmandu')).toBe(86400);
+  });
+
+  it('converts cleanly to a quarter-hour offset at local midnight (Pacific/Chatham, UTC+12:45)', () => {
+    // UTC 2024-06-14T11:15:00Z == 2024-06-15T00:00:00 in Pacific/Chatham (UTC+12:45).
+    // Chatham uses a +12:45 standard offset — the most extreme fractional offset in
+    // use today. Verifying it lands cleanly on 86400 proves no date shift occurs.
+    vi.setSystemTime(new Date('2024-06-14T11:15:00.000Z'));
+
+    expect(getSecondsUntilMidnightInTimezone('Pacific/Chatham')).toBe(86400);
+  });
+
+  it('handles the leap-year Feb 29 → Mar 1 crossing under UTC+14 without calendar shifting', () => {
+    // UTC 2024-02-28T10:00:00Z == 2024-02-29T00:00:00 in Pacific/Kiritimati (UTC+14).
+    // Local date is Feb 29 (valid only in a leap year). At local midnight the
+    // utility should return 86400 — proving the +14h shift did not skip the leap day.
+    vi.setSystemTime(new Date('2024-02-28T10:00:00.000Z'));
+
+    expect(getSecondsUntilMidnightInTimezone('Pacific/Kiritimati')).toBe(86400);
+  });
+
+  it('handles month-end (Jun 30 → Jul 1) crossing under UTC-12 without calendar shifting', () => {
+    // UTC 2024-07-01T12:00:00Z == 2024-07-01T00:00:00 in Etc/GMT+12 (UTC-12).
+    // The UTC instant is already in July, but the local date is still July 1 at
+    // midnight — confirming the negative offset rolls the calendar back cleanly.
+    vi.setSystemTime(new Date('2024-07-01T12:00:00.000Z'));
+
+    expect(getSecondsUntilMidnightInTimezone('Etc/GMT+12')).toBe(86400);
+  });
+
+  it('returns a strictly decreasing TTL across a sliding window approaching local midnight (UTC+14)', () => {
+    // Under an extreme positive offset, the TTL must decrement monotonically as we
+    // approach local midnight — any non-monotonic jump would reveal a date-shift bug
+    // in the Intl formatter path. Each entry is [UTC time, expected seconds left].
+    const cases: [string, number][] = [
+      ['2024-06-14T08:00:00.000Z', 7200], // 2 hours before local midnight in UTC+14
+      ['2024-06-14T09:00:00.000Z', 3600], // 1 hour before
+      ['2024-06-14T09:30:00.000Z', 1800], // 30 minutes before
+      ['2024-06-14T09:59:59.000Z', 1], // 1 second before
+      ['2024-06-14T10:00:00.000Z', 86400], // exact local midnight — resets to full day
+    ];
+
+    let previous = Infinity;
+    for (const [utcTime, expected] of cases) {
+      vi.setSystemTime(new Date(utcTime));
+      const seconds = getSecondsUntilMidnightInTimezone('Pacific/Kiritimati');
+
+      expect(seconds).toBe(expected);
+
+      // Monotonic check: TTL must decrease until it resets at exact midnight.
+      if (expected !== 86400) {
+        expect(seconds).toBeLessThan(previous);
+      }
+      previous = seconds;
+    }
+  });
+
+  it('returns a strictly decreasing TTL across a sliding window approaching local midnight (UTC-12)', () => {
+    // Mirror of the previous test but for the most extreme *negative* offset.
+    // This guards against asymmetric bugs that only manifest for negative offsets.
+    const cases: [string, number][] = [
+      ['2024-06-15T10:00:00.000Z', 7200], // 2 hours before local midnight in UTC-12
+      ['2024-06-15T11:00:00.000Z', 3600], // 1 hour before
+      ['2024-06-15T11:30:00.000Z', 1800], // 30 minutes before
+      ['2024-06-15T11:59:59.000Z', 1], // 1 second before
+      ['2024-06-15T12:00:00.000Z', 86400], // exact local midnight — resets to full day
+    ];
+
+    let previous = Infinity;
+    for (const [utcTime, expected] of cases) {
+      vi.setSystemTime(new Date(utcTime));
+      const seconds = getSecondsUntilMidnightInTimezone('Etc/GMT+12');
+
+      expect(seconds).toBe(expected);
+
+      if (expected !== 86400) {
+        expect(seconds).toBeLessThan(previous);
+      }
+      previous = seconds;
+    }
   });
 });
