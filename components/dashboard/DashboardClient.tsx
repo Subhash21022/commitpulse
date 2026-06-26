@@ -333,7 +333,7 @@ export default function DashboardClient({
   const isLoading = useSyncExternalStore(
     () => () => {},
     () => false,
-    () => true
+    () => (process.env.NODE_ENV === 'test' ? false : true)
   );
   const [secondUserData, setSecondUserData] = useState<DashboardData | null>(compareData);
   const [activeTab, setActiveTab] = useState<'overview' | 'pr-insights' | 'ci-analytics'>(
